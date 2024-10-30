@@ -4,8 +4,8 @@ import random
 import numpy as np
 import torch
 
-from src.generate_label import create_image_label
 from src.replay_buffer import ReplayBuffer
+from src.utils import get_device
 
 
 def get_roi_from_image(position: Tuple[int, int, int], image: np.ndarray, roi_len: Tuple[int, int, int]) -> np.ndarray:
@@ -53,6 +53,7 @@ def step_env(
 
 def eps_greedy_episode(
     image_data: np.ndarray,
+    image_label: np.ndarray,
     landmark: Tuple[int, int, int],
     max_steps: int,
     epsilon: float,
@@ -64,7 +65,6 @@ def eps_greedy_episode(
     steps = 1
     while True:
         roi = get_roi_from_image(position, image_data, roi_len)
-        image_label = create_image_label(image_data, landmark)
         direction_label = image_label[position]
         rb.add_to_buffer((roi, direction_label))
         if position == landmark:
@@ -91,7 +91,7 @@ def get_random_direction() -> Tuple[int, int, int]:
 
 
 def get_model_pred_direction(roi: np.ndarray, model: torch.nn.Module) -> Tuple[int, int, int]:
-    roi = torch.from_numpy(roi).to(dtype=torch.float32)
+    roi = torch.from_numpy(roi).to(dtype=torch.float32).to(get_device())
     pred_direction = model(roi).squeeze()
     direction = pred_to_direction(pred_direction)
     return direction

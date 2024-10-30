@@ -18,14 +18,17 @@ def get_direction_to_label_discret(point: Tuple[int, int, int], label: Tuple[int
     return tuple(map(lambda x: np.clip(x, -1, 1), dists))
 
 
-def get_direction_to_label_unit_vector(point: Tuple[int, int, int], label: Tuple[int, int, int]) -> Tuple[int, int, int]:
+def get_direction_to_label_unit_vector(
+    point: Tuple[int, int, int], label: Tuple[int, int, int]
+) -> Tuple[int, int, int]:
     dists = [label[dim] - point[dim] for dim in range(3)]
-    norm = sum([v**2 for v in dists])**0.5
+    norm = sum([v**2 for v in dists]) ** 0.5
     if norm == 0:
         return (0, 0, 0)
-    return tuple(map(lambda x:x/norm, dists))
+    return tuple(map(lambda x: x / norm, dists))
 
 
+# TODO: vectorise this?
 def create_image_label(image: np.ndarray, label: Tuple[int, int, int]) -> np.ndarray:
     empty_labels = create_empty_image_label(image, label)
     xdim, ydim, zdim, _ = empty_labels.shape

@@ -5,7 +5,6 @@ import numpy as np
 
 
 class ReplayBuffer:
-
     def __init__(self, max_size: int):
         self.max_size = max_size
         self.index = 0

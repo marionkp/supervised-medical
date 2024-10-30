@@ -6,9 +6,9 @@ import torch
 
 # TODO: set device type
 
+
 # TODO: add some layer norms? other improvements to network?
 class Net(torch.nn.Module):
-
     def __init__(self, roi_len: Tuple[int, int, int]):
         super().__init__()
         roi_size = tuple([2 * v - 1 for v in roi_len])
@@ -31,6 +31,6 @@ class Net(torch.nn.Module):
         x = self.fc1(x)
         x = torch.nn.functional.leaky_relu(x)
         x = self.output(x)
-        x = torch.nn.functional.tanh(x)
+        x = torch.tanh(x)
         # TODO: add a unit vector normalising final activation
         return x

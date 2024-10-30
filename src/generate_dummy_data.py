@@ -3,12 +3,12 @@ from typing import Tuple
 import numpy as np
 import torch
 
-from src.generate_label import create_image_label
 from src.env import eps_greedy_episode, get_random_3d_pos
 from src.replay_buffer import ReplayBuffer
 
 
 # TODO: add function to generate dummy .nii.gz data
+
 
 def generate_data(xdim: int, ydim: int, zdim: int, xlabel: int, ylabel: int, zlabel: int) -> np.ndarray:
     assert 0 <= xlabel < xdim
@@ -26,6 +26,7 @@ def generate_data(xdim: int, ydim: int, zdim: int, xlabel: int, ylabel: int, zla
         ] = val
     assert data.shape == (xdim, ydim, zdim)
     return data
+
 
 # TODO: just a one where the landmark is
 # def generate_data(xdim: int, ydim: int, zdim: int, xlabel: int, ylabel: int, zlabel: int) -> np.ndarray:
@@ -45,7 +46,7 @@ def random_eps_greedy_episode(
     roi_len: Tuple[int, int, int],
     model: torch.nn.Module,
     rb: ReplayBuffer,
-    keep_landmark_fixed: bool = False
+    keep_landmark_fixed: bool = False,
 ) -> int:
     if keep_landmark_fixed:
         landmark = (0, 0, 0)

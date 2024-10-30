@@ -1,3 +1,8 @@
+# Supervised Medical
+
+## Train
+
+`python3 -m src.train`
 
 ## Test
 
