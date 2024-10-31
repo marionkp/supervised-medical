@@ -17,6 +17,7 @@ class ReplayBuffer:
             self.rois.append(roi)
             self.labels.append(label)
         else:
+            # TODO: random eviction instead of fifo would reduce sample correlation
             self.rois[self.index] = roi
             self.labels[self.index] = label
         self.index = (self.index + 1) % self.max_size

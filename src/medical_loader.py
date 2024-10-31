@@ -1,5 +1,6 @@
+from typing import List, Optional, Tuple
+import logging
 import random
-from typing import List, Tuple
 
 import numpy as np
 import SimpleITK as sitk
@@ -49,21 +50,32 @@ def str_to_landmarks(landmark_str: str) -> Tuple[Tuple[int, int, int]]:
 
 
 class MedicalEnv:
-    def __init__(self, path_to_image_files: str, path_to_landmark_files: str, landmark_index: int):
+    def __init__(
+        self,
+        path_to_image_files: str,
+        path_to_landmark_files: str,
+        landmark_index: int,
+        debug_max_num_files: Optional[int],
+    ):
         self.image_file_paths = read_paths_from_file(path_to_image_files)
         self.landmark_file_paths = read_paths_from_file(path_to_landmark_files)
         assert len(self.image_file_paths) == len(self.landmark_file_paths)
         self.num_files = len(self.image_file_paths)
+        if debug_max_num_files is not None:
+            self.num_files = min(debug_max_num_files, self.num_files)
         self.landmark_index = landmark_index
         self.path_to_data = {}
 
     def get_image_label_landmark(self, index: int) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
         if index not in self.path_to_data:
             # TODO: wandb log time spent loading image, do some profiling
+            logging.info(f"Loading image and labels at index {index}")
             image_data = load_image(self.image_file_paths[index])
             landmark = read_landmark_file(self.landmark_file_paths[index])[self.landmark_index]
             label = create_image_label(image_data, landmark)
             self.path_to_data[index] = (image_data, label, landmark)
+        else:
+            logging.info(f"Retrieving image and labels from cache at index {index}")
         return self.path_to_data[index]
 
     def sample_image_label_landmark(self) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:

@@ -14,6 +14,7 @@ class Net(torch.nn.Module):
         roi_size = tuple([2 * v - 1 for v in roi_len])
         out_chan = 5
         kernel_size = (3, 3, 3)
+        # TODO: any custom weight initialisation?
         self.conv3d = torch.nn.Conv3d(1, out_chan, kernel_size)
         conv_out_shape = math.prod([roi_size[i] - (kernel_size[i] // 2 + 1) for i in range(3)])
         hidden_size = (out_chan * conv_out_shape // 2) + 1

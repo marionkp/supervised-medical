@@ -19,7 +19,7 @@ def batch_train(
     rb: ReplayBuffer,
     model: torch.nn.Module,
     batch_size: int,
-) -> torch.nn.Module:
+) -> float:
     roi, label = rb.sample_roi_and_label(batch_size)
     roi = torch.from_numpy(roi).to(dtype=torch.float32).to(get_device())
     pred_direction = model(roi)
@@ -28,6 +28,7 @@ def batch_train(
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    loss = loss.detach().cpu().item()
     return loss
 
 
@@ -48,23 +49,22 @@ def get_grad_norm(model: torch.nn.Module) -> float:
 
 
 def training_run():
-    roi_len = (2, 2, 2)
-    image_dims = (6, 6, 6)
+    roi_len = (8, 8, 8)
     min_epsilon = 0
     epsilon = 1
     delta = 0.001
     max_steps = 100
-    max_replay_size = 16  # 10000
-    batch_size = 16
+    max_replay_size = 5000
+    batch_size = 32
     lr = 1e-3
     landmark_index = 0
-
+    batch_trained_per_episode = 10
+    debug_max_num_files = 1
     warmup_size = max(batch_size, max_replay_size // 100)
 
     config = {
         "start_epsilon": epsilon,
         "delta": delta,
-        "image_dims": image_dims,
         "roi_len": roi_len,
         "max_steps": max_steps,
         "max_replay_size": max_replay_size,
@@ -73,10 +73,12 @@ def training_run():
         "min_epsilon": min_epsilon,
         "learning_rate": lr,
         "landmark_index": landmark_index,
+        "batch_trained_per_episode": batch_trained_per_episode,
+        "debug_max_num_files": debug_max_num_files,
     }
     logging.info(f"{config=}")
     wandb.init(
-        project="supervised-medical-mayou", config=config, mode="disabled"
+        project="supervised-medical-mayou", config=config, mode="online"
     )  # TODO: add argparse for mode="disabled" or "online"
 
     # TODO: add dry-run/random data argparse option
@@ -84,7 +86,7 @@ def training_run():
     # TODO: move these hardcoded paths to argparse
     image_files = "/mnt/d/project_guy/filenames/image_files.txt"
     landmark_files = "/mnt/d/project_guy/filenames/landmark_files.txt"
-    env = MedicalEnv(image_files, landmark_files, landmark_index)
+    env = MedicalEnv(image_files, landmark_files, landmark_index, debug_max_num_files)
     model = Net(roi_len).to(get_device())
     rb = ReplayBuffer(max_replay_size)
     # TODO: is this criterion correct?
@@ -94,11 +96,13 @@ def training_run():
     for episode in range(100000):
         image_data, image_label, landmark = env.sample_image_label_landmark()
         steps = eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb)
-        # TODO: run multiple batch trains per random greedy eps
-        loss = batch_train(criterion, optimizer, rb, model, batch_size)
+        total_loss = 0
+        for _ in range(batch_trained_per_episode):
+            total_loss += batch_train(criterion, optimizer, rb, model, batch_size)
+        loss = total_loss / batch_trained_per_episode
         log_dict = {
             "episode": episode,
-            "loss": loss.item(),
+            "loss": loss,
             "epsilon": epsilon,
             "replay_buffer_size": len(rb),
             "steps": steps,
@@ -110,4 +114,7 @@ def training_run():
 
 if __name__ == "__main__":
     # TODO: add argparse here
+    logging.basicConfig(
+        level=logging.INFO, format="[%(asctime)s %(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     training_run()
