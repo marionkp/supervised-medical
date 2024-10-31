@@ -23,6 +23,7 @@ def get_roi_from_image(position: Tuple[int, int, int], image: np.ndarray, roi_le
         max(0, ypos - ylen + 1) : min(ypos + ylen, ydim),
         max(0, zpos - zlen + 1) : min(zpos + zlen, zdim),
     ]
+    # TODO: is 0 a good value to pad? What is the imaging null value?
     padding = (
         (max(0, xlen - xpos - 1), max(0, xpos + xlen - xdim)),
         (max(0, ylen - ypos - 1), max(0, ypos + ylen - ydim)),

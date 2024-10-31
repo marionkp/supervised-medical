@@ -13,7 +13,7 @@ def create_empty_image_label(image: np.ndarray, label: Tuple[int, int, int]) -> 
 
 
 # TODO: should the direction be a unit vector directly towards the landmark instead?
-def get_direction_to_label_discret(point: Tuple[int, int, int], label: Tuple[int, int, int]) -> Tuple[int, int, int]:
+def get_direction_to_label_discrete(point: Tuple[int, int, int], label: Tuple[int, int, int]) -> Tuple[int, int, int]:
     dists = (label[dim] - point[dim] for dim in range(3))
     return tuple(map(lambda x: np.clip(x, -1, 1), dists))
 

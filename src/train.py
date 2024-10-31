@@ -93,7 +93,8 @@ def training_run():
     criterion = torch.nn.MSELoss(reduction="mean")
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     warmup_replay_buffer(warmup_size, env, max_steps, roi_len, rb)
-    for episode in range(100000):
+    episode = 0
+    while True:
         image_data, image_label, landmark = env.sample_image_label_landmark()
         steps = eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb)
         total_loss = 0
@@ -110,6 +111,7 @@ def training_run():
         wandb.log(log_dict)
         logging.info(f"{log_dict=}")
         epsilon = max(min_epsilon, epsilon - delta)
+        episode += 1
 
 
 if __name__ == "__main__":
