@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 import random
 
 import numpy as np
@@ -61,15 +61,19 @@ def eps_greedy_episode(
     roi_len: Tuple[int, int, int],
     model: torch.nn.Module,
     rb: ReplayBuffer,
+    debug_starting_position: Optional[Tuple[int, int, int]]
 ) -> int:
-    position = get_random_3d_pos(image_data.shape)
+    if debug_starting_position is None:
+        position = get_random_3d_pos(image_data.shape)
+    else:
+        position = debug_starting_position
     steps = 1
     while True:
         roi = get_roi_from_image(position, image_data, roi_len)
         direction_label = image_label[position]
         rb.add_to_buffer((roi, direction_label))
         if position == landmark:
-            # TODO: log this in wandb?
+            # TODO: log landmark found in wandb?
             return steps
         if steps >= max_steps:
             return steps

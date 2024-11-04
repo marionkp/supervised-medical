@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import logging
 import numpy as np
@@ -22,25 +22,24 @@ def batch_train(
 ) -> float:
     roi, label = rb.sample_roi_and_label(batch_size)
     roi = torch.from_numpy(roi).to(dtype=torch.float32).to(get_device())
+    optimizer.zero_grad()
     pred_direction = model(roi)
     true_direction = torch.from_numpy(label).to(dtype=torch.float32).to(get_device())
     loss = criterion(pred_direction, true_direction)
-    optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     loss = loss.detach().cpu().item()
     return loss
 
-
 def warmup_replay_buffer(
-    warmup_size: int, env: MedicalEnv, max_steps: int, roi_len: Tuple[int, int, int], rb: ReplayBuffer
+    warmup_size: int, env: MedicalEnv, max_steps: int, roi_len: Tuple[int, int, int], rb: ReplayBuffer, debug_starting_position: Optional[Tuple[int, int, int]]
 ):
     assert warmup_size <= rb.max_size
     epsilon = 1
     model = None  # No model prediction during model
     while len(rb) < warmup_size:
         image_data, image_label, landmark = env.sample_image_label_landmark()
-        eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb)
+        eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position)
 
 
 # TODO: should I log the gradients? Separate them?
@@ -60,6 +59,7 @@ def training_run():
     landmark_index = 0
     batch_trained_per_episode = 10
     debug_max_num_files = 1
+    debug_starting_position = None
     warmup_size = max(batch_size, max_replay_size // 100)
 
     config = {
@@ -75,6 +75,7 @@ def training_run():
         "landmark_index": landmark_index,
         "batch_trained_per_episode": batch_trained_per_episode,
         "debug_max_num_files": debug_max_num_files,
+        "debug_starting_position": debug_starting_position,
     }
     logging.info(f"{config=}")
     wandb.init(
@@ -89,14 +90,13 @@ def training_run():
     env = MedicalEnv(image_files, landmark_files, landmark_index, debug_max_num_files)
     model = Net(roi_len).to(get_device())
     rb = ReplayBuffer(max_replay_size)
-    # TODO: is this criterion correct?
-    criterion = torch.nn.MSELoss(reduction="mean")
+    criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    warmup_replay_buffer(warmup_size, env, max_steps, roi_len, rb)
+    warmup_replay_buffer(warmup_size, env, max_steps, roi_len, rb, debug_starting_position)
     episode = 0
     while True:
         image_data, image_label, landmark = env.sample_image_label_landmark()
-        steps = eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb)
+        steps = eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position)
         total_loss = 0
         for _ in range(batch_trained_per_episode):
             total_loss += batch_train(criterion, optimizer, rb, model, batch_size)
@@ -110,6 +110,7 @@ def training_run():
         }
         wandb.log(log_dict)
         logging.info(f"{log_dict=}")
+        # TODO: save model every once and a while
         epsilon = max(min_epsilon, epsilon - delta)
         episode += 1
 

@@ -32,6 +32,6 @@ class Net(torch.nn.Module):
         x = self.fc1(x)
         x = torch.nn.functional.leaky_relu(x)
         x = self.output(x)
-        x = torch.tanh(x)
+        # NOTE: Tanh output layer prevents training, how come?
         # TODO: add a unit vector normalising final activation
         return x
