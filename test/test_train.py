@@ -14,7 +14,7 @@ def test_batch_independence():
 
 def test_same_position_training():
     roi_len = (5, 5, 5)
-    roi_dims = tuple([2*v-1 for v in roi_len])
+    roi_dims = tuple([2 * v - 1 for v in roi_len])
     batch_size = 1
     lr = 1e-3
     model = Net(roi_len).to(get_device())

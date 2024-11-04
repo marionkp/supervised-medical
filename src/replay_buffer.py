@@ -7,7 +7,6 @@ import numpy as np
 class ReplayBuffer:
     def __init__(self, max_size: int):
         self.max_size = max_size
-        self.index = 0
         self.rois = []
         self.labels = []
 
@@ -17,10 +16,9 @@ class ReplayBuffer:
             self.rois.append(roi)
             self.labels.append(label)
         else:
-            # TODO: random eviction instead of fifo would reduce sample correlation
-            self.rois[self.index] = roi
-            self.labels[self.index] = label
-        self.index = (self.index + 1) % self.max_size
+            index = random.randint(0, self.max_size - 1)
+            self.rois[index] = roi
+            self.labels[index] = label
 
     def sample_roi_and_label(self, batch_size: int) -> Tuple[np.ndarray, np.ndarray]:
         assert batch_size <= len(self), f"batch size {batch_size} is larger than the replay buffer size {len(self)}"

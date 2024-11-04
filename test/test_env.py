@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.env import get_roi_from_image
+from src.env import dist_3d_points, get_roi_from_image
 
 
 def test_roi_is_full_image():
@@ -30,6 +30,11 @@ def test_roi_with_padding():
     assert roi.shape == (3, 5, 7)
     assert (roi[1:2, 1:3, 1:4] == image).all()
     assert roi[0, 0, 0] == roi[2, 3, 4] == 0
+
+
+def test_3d_point_dist():
+    assert dist_3d_points((0, 0, 0), (0, -1, 0)) == 1
+    assert dist_3d_points((1, 4, 5), (1, 1, 1)) == 5
 
 
 # TODO: add test to check the right samples are given to the replay buffer during the episode

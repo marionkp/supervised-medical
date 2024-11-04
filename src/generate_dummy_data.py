@@ -53,5 +53,5 @@ def random_eps_greedy_episode(
     else:
         landmark = get_random_3d_pos(image_dims)
     image_data = generate_data(*image_dims, *landmark)
-    steps = eps_greedy_episode(image_data, landmark, max_steps, epsilon, roi_len, model, rb)
+    steps, _ = eps_greedy_episode(image_data, landmark, max_steps, epsilon, roi_len, model, rb)
     return steps

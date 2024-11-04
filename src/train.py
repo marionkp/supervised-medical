@@ -31,15 +31,23 @@ def batch_train(
     loss = loss.detach().cpu().item()
     return loss
 
+
 def warmup_replay_buffer(
-    warmup_size: int, env: MedicalEnv, max_steps: int, roi_len: Tuple[int, int, int], rb: ReplayBuffer, debug_starting_position: Optional[Tuple[int, int, int]]
+    warmup_size: int,
+    env: MedicalEnv,
+    max_steps: int,
+    roi_len: Tuple[int, int, int],
+    rb: ReplayBuffer,
+    debug_starting_position: Optional[Tuple[int, int, int]],
 ):
     assert warmup_size <= rb.max_size
     epsilon = 1
     model = None  # No model prediction during model
     while len(rb) < warmup_size:
         image_data, image_label, landmark = env.sample_image_label_landmark()
-        eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position)
+        eps_greedy_episode(
+            image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position
+        )
 
 
 # TODO: should I log the gradients? Separate them?
@@ -48,7 +56,7 @@ def get_grad_norm(model: torch.nn.Module) -> float:
 
 
 def training_run():
-    roi_len = (8, 8, 8)
+    roi_len = (10, 10, 10)
     min_epsilon = 0
     epsilon = 1
     delta = 0.001
@@ -61,6 +69,8 @@ def training_run():
     debug_max_num_files = 1
     debug_starting_position = None
     warmup_size = max(batch_size, max_replay_size // 100)
+    debug_image_type = "real"  # dummy or real
+    debug_dummy_image_dims = None
 
     config = {
         "start_epsilon": epsilon,
@@ -76,6 +86,8 @@ def training_run():
         "batch_trained_per_episode": batch_trained_per_episode,
         "debug_max_num_files": debug_max_num_files,
         "debug_starting_position": debug_starting_position,
+        "debug_image_type": debug_image_type,
+        "debug_dummy_image_dims": debug_dummy_image_dims,
     }
     logging.info(f"{config=}")
     wandb.init(
@@ -87,7 +99,9 @@ def training_run():
     # TODO: move these hardcoded paths to argparse
     image_files = "/mnt/d/project_guy/filenames/image_files.txt"
     landmark_files = "/mnt/d/project_guy/filenames/landmark_files.txt"
-    env = MedicalEnv(image_files, landmark_files, landmark_index, debug_max_num_files)
+    env = MedicalEnv(
+        image_files, landmark_files, landmark_index, debug_max_num_files, debug_image_type, debug_dummy_image_dims
+    )
     model = Net(roi_len).to(get_device())
     rb = ReplayBuffer(max_replay_size)
     criterion = torch.nn.MSELoss()
@@ -96,7 +110,9 @@ def training_run():
     episode = 0
     while True:
         image_data, image_label, landmark = env.sample_image_label_landmark()
-        steps = eps_greedy_episode(image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position)
+        steps, final_dist = eps_greedy_episode(
+            image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position
+        )
         total_loss = 0
         for _ in range(batch_trained_per_episode):
             total_loss += batch_train(criterion, optimizer, rb, model, batch_size)
@@ -107,6 +123,7 @@ def training_run():
             "epsilon": epsilon,
             "replay_buffer_size": len(rb),
             "steps": steps,
+            "final_dist": final_dist,
         }
         wandb.log(log_dict)
         logging.info(f"{log_dict=}")

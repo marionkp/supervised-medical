@@ -52,6 +52,10 @@ def step_env(
     return new_pos
 
 
+def dist_3d_points(a: Tuple[float, float, float], b: Tuple[float, float, float]) -> float:
+    return sum([(i - j) ** 2 for i, j in zip(a, b)]) ** 0.5
+
+
 def eps_greedy_episode(
     image_data: np.ndarray,
     image_label: np.ndarray,
@@ -61,7 +65,7 @@ def eps_greedy_episode(
     roi_len: Tuple[int, int, int],
     model: torch.nn.Module,
     rb: ReplayBuffer,
-    debug_starting_position: Optional[Tuple[int, int, int]]
+    debug_starting_position: Optional[Tuple[int, int, int]],
 ) -> int:
     if debug_starting_position is None:
         position = get_random_3d_pos(image_data.shape)
@@ -72,11 +76,9 @@ def eps_greedy_episode(
         roi = get_roi_from_image(position, image_data, roi_len)
         direction_label = image_label[position]
         rb.add_to_buffer((roi, direction_label))
-        if position == landmark:
-            # TODO: log landmark found in wandb?
-            return steps
-        if steps >= max_steps:
-            return steps
+        if position == landmark or steps >= max_steps:
+            final_dist = dist_3d_points(position, landmark)
+            return steps, final_dist
         direction = get_eps_greedy_direction(roi, epsilon, model)
         position = step_env(position, direction, image_data.shape)
         steps += 1

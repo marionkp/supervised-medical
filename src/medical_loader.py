@@ -5,6 +5,7 @@ import random
 import numpy as np
 import SimpleITK as sitk
 
+from src.generate_dummy_data import generate_data, get_random_3d_pos
 from src.generate_label import create_image_label
 
 
@@ -56,6 +57,8 @@ class MedicalEnv:
         path_to_landmark_files: str,
         landmark_index: int,
         debug_max_num_files: Optional[int],
+        debug_image_type: str,
+        debug_dummy_image_dims: Optional[Tuple[int, int, int]],
     ):
         self.image_file_paths = read_paths_from_file(path_to_image_files)
         self.landmark_file_paths = read_paths_from_file(path_to_landmark_files)
@@ -65,19 +68,32 @@ class MedicalEnv:
             self.num_files = min(debug_max_num_files, self.num_files)
         self.landmark_index = landmark_index
         self.path_to_data = {}
+        self.debug_image_type = debug_image_type
+        self.debug_dummy_image_dims = debug_dummy_image_dims
 
     def get_image_label_landmark(self, index: int) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
         if index not in self.path_to_data:
             # TODO: wandb log time spent loading image, do some profiling
-            logging.info(f"Loading image and labels at index {index}")
             image_data = load_image(self.image_file_paths[index])
             landmark = read_landmark_file(self.landmark_file_paths[index])[self.landmark_index]
             label = create_image_label(image_data, landmark)
+            logging.info(f"Loaded image and labels at index {index} - image shape {image_data.shape}")
             self.path_to_data[index] = (image_data, label, landmark)
         else:
             logging.info(f"Retrieving image and labels from cache at index {index}")
         return self.path_to_data[index]
 
     def sample_image_label_landmark(self) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
-        sampled_index = random.randint(0, self.num_files - 1)
-        return self.get_image_label_landmark(sampled_index)
+        if self.debug_image_type == "real":
+            sampled_index = random.randint(0, self.num_files - 1)
+            return self.get_image_label_landmark(sampled_index)
+        elif self.debug_image_type == "dummy":
+            return self.sample_dummy_image_label_landmark()
+        else:
+            raise NotImplementedError()
+
+    def sample_dummy_image_label_landmark(self) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
+        landmark = get_random_3d_pos(self.debug_dummy_image_dims)
+        image_data = generate_data(*self.debug_dummy_image_dims, *landmark)
+        label = create_image_label(image_data, landmark)
+        return (image_data, label, landmark)
