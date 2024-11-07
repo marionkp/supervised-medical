@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+import time
 
 import logging
 import numpy as np
@@ -37,6 +38,7 @@ def warmup_replay_buffer(
     env: MedicalEnv,
     max_steps: int,
     roi_len: Tuple[int, int, int],
+    stride: int,
     rb: ReplayBuffer,
     debug_starting_position: Optional[Tuple[int, int, int]],
 ):
@@ -46,7 +48,7 @@ def warmup_replay_buffer(
     while len(rb) < warmup_size:
         image_data, image_label, landmark = env.sample_image_label_landmark()
         eps_greedy_episode(
-            image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position
+            image_data, image_label, landmark, max_steps, epsilon, roi_len, stride, model, rb, debug_starting_position
         )
 
 
@@ -56,26 +58,34 @@ def get_grad_norm(model: torch.nn.Module) -> float:
 
 
 def training_run():
-    roi_len = (10, 10, 10)
+    roi_len = (40, 40, 40)
+    stride = 4
     min_epsilon = 0
     epsilon = 1
     delta = 0.001
     max_steps = 100
-    max_replay_size = 5000
-    batch_size = 32
-    lr = 1e-3
+    max_replay_size = 4000  # 10000
+    batch_size = 1024  # 4096
+    # TODO: learning rate schedule? warmup and then decrease
+    lr = 1e-4
     landmark_index = 0
-    batch_trained_per_episode = 10
+    batch_trained_per_epoch = 1
+    episodes_collected_per_epoch = 4
     debug_max_num_files = 1
     debug_starting_position = None
-    warmup_size = max(batch_size, max_replay_size // 100)
     debug_image_type = "real"  # dummy or real
-    debug_dummy_image_dims = None
+    debug_dummy_image_dims = (10, 10, 10)
+
+    warmup_size = max(batch_size, max_replay_size // 100)
+
+    model = Net(roi_len, stride).to(get_device())
+    model_num_params = sum(p.numel() for p in model.parameters())
 
     config = {
         "start_epsilon": epsilon,
         "delta": delta,
         "roi_len": roi_len,
+        "stride": stride,
         "max_steps": max_steps,
         "max_replay_size": max_replay_size,
         "batch_size": batch_size,
@@ -83,7 +93,8 @@ def training_run():
         "min_epsilon": min_epsilon,
         "learning_rate": lr,
         "landmark_index": landmark_index,
-        "batch_trained_per_episode": batch_trained_per_episode,
+        "batch_trained_per_epoch": batch_trained_per_epoch,
+        "model_num_params": model_num_params,
         "debug_max_num_files": debug_max_num_files,
         "debug_starting_position": debug_starting_position,
         "debug_image_type": debug_image_type,
@@ -102,28 +113,56 @@ def training_run():
     env = MedicalEnv(
         image_files, landmark_files, landmark_index, debug_max_num_files, debug_image_type, debug_dummy_image_dims
     )
-    model = Net(roi_len).to(get_device())
     rb = ReplayBuffer(max_replay_size)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    warmup_replay_buffer(warmup_size, env, max_steps, roi_len, rb, debug_starting_position)
+    warmup_replay_buffer(warmup_size, env, max_steps, roi_len, stride, rb, debug_starting_position)
     episode = 0
     while True:
-        image_data, image_label, landmark = env.sample_image_label_landmark()
-        steps, final_dist = eps_greedy_episode(
-            image_data, image_label, landmark, max_steps, epsilon, roi_len, model, rb, debug_starting_position
-        )
-        total_loss = 0
-        for _ in range(batch_trained_per_episode):
-            total_loss += batch_train(criterion, optimizer, rb, model, batch_size)
-        loss = total_loss / batch_trained_per_episode
+        sampling_image_avg_time = 0
+        eps_greedy_episode_avg_time = 0
+        steps_avg = 0
+        final_dist_avg = 0
+        for _ in range(episodes_collected_per_epoch):
+            sampling_image_start_time = time.time()
+            image_data, image_label, landmark = env.sample_image_label_landmark()
+            sampling_image_avg_time += time.time() - sampling_image_start_time
+            eps_greedy_episode_start_time = time.time()
+            steps, final_dist = eps_greedy_episode(
+                image_data,
+                image_label,
+                landmark,
+                max_steps,
+                epsilon,
+                roi_len,
+                stride,
+                model,
+                rb,
+                debug_starting_position,
+            )
+            steps_avg += steps
+            final_dist_avg += final_dist
+            eps_greedy_episode_avg_time += time.time() - eps_greedy_episode_start_time
+        sampling_image_avg_time /= episodes_collected_per_epoch
+        eps_greedy_episode_avg_time /= episodes_collected_per_epoch
+        final_dist_avg /= episodes_collected_per_epoch
+        steps_avg /= episodes_collected_per_epoch
+        batch_train_start_time = time.time()
+        loss_avg = 0
+        for _ in range(batch_trained_per_epoch):
+            loss_avg += batch_train(criterion, optimizer, rb, model, batch_size)
+        loss_avg /= batch_trained_per_epoch
+        batch_train_time = time.time() - batch_train_start_time
         log_dict = {
             "episode": episode,
-            "loss": loss,
+            "loss": loss_avg,
             "epsilon": epsilon,
             "replay_buffer_size": len(rb),
-            "steps": steps,
-            "final_dist": final_dist,
+            "steps": steps_avg,
+            "final_dist": final_dist_avg,
+            "sampling_image_time": sampling_image_avg_time,
+            "eps_greedy_episode_time": eps_greedy_episode_avg_time,
+            "batch_train_time": batch_train_time,
         }
         wandb.log(log_dict)
         logging.info(f"{log_dict=}")

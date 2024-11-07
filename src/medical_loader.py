@@ -93,6 +93,7 @@ class MedicalEnv:
             raise NotImplementedError()
 
     def sample_dummy_image_label_landmark(self) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
+        assert self.debug_dummy_image_dims is not None, f"debug_dummy_image_dims is None, provide some dummy dimensions"
         landmark = get_random_3d_pos(self.debug_dummy_image_dims)
         image_data = generate_data(*self.debug_dummy_image_dims, *landmark)
         label = create_image_label(image_data, landmark)

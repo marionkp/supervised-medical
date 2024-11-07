@@ -3,22 +3,31 @@ import math
 
 import torch
 
+from src.env import get_roi_dims_from_len_and_stride
+
 
 # TODO: set device type
 
 
 # TODO: add some layer norms? other improvements to network?
 class Net(torch.nn.Module):
-    def __init__(self, roi_len: Tuple[int, int, int]):
+    def __init__(self, roi_len: Tuple[int, int, int], stride: int):
         super().__init__()
-        roi_size = tuple([2 * v - 1 for v in roi_len])
-        out_chan = 5
-        kernel_size = (3, 3, 3)
+        roi_size = get_roi_dims_from_len_and_stride(roi_len, stride)
+        out_chan = 4
+        kernel_size = (16, 16, 16)
         # TODO: any custom weight initialisation?
         self.conv3d = torch.nn.Conv3d(1, out_chan, kernel_size)
-        conv_out_shape = math.prod([roi_size[i] - (kernel_size[i] // 2 + 1) for i in range(3)])
-        hidden_size = (out_chan * conv_out_shape // 2) + 1
-        self.fc1 = torch.nn.Linear(out_chan * conv_out_shape, hidden_size)
+        # 3d Conv Shape description: https://pytorch.org/docs/stable/generated/torch.nn.Conv3d.html#torch.nn.Conv3d
+        padding = 0
+        dilation = 1
+        stride = 1
+        conv3d_out_shape = [
+            int((roi_size[i] + 2 * padding - dilation * (kernel_size[i] - 1) / stride - 1) + 1) for i in range(3)
+        ]
+        conv_out_shape = int(math.prod((out_chan, *conv3d_out_shape)))
+        hidden_size = conv_out_shape // 2 + 1
+        self.fc1 = torch.nn.Linear(conv_out_shape, hidden_size)
         self.output = torch.nn.Linear(hidden_size, 3)
 
     def forward(self, x: torch.Tensor):

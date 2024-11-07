@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+import math
 import random
 
 import numpy as np
@@ -8,7 +9,13 @@ from src.replay_buffer import ReplayBuffer
 from src.utils import get_device
 
 
-def get_roi_from_image(position: Tuple[int, int, int], image: np.ndarray, roi_len: Tuple[int, int, int]) -> np.ndarray:
+def get_roi_dims_from_len_and_stride(roi_len: Tuple[int, int, int], stride: int) -> Tuple[int, int, int]:
+    return tuple([math.ceil((2 * v - 1) / stride) for v in roi_len])
+
+
+def get_roi_from_image(
+    position: Tuple[int, int, int], image: np.ndarray, roi_len: Tuple[int, int, int], stride: int
+) -> np.ndarray:
     """
     RoI len is the distance for one axis from the position (included) to the edge (size 2x-1).
     E.g. RoI dim (2, 1, 4) would return a 3D array of size (3, 1, 9)
@@ -29,16 +36,8 @@ def get_roi_from_image(position: Tuple[int, int, int], image: np.ndarray, roi_le
         (max(0, ylen - ypos - 1), max(0, ypos + ylen - ydim)),
         (max(0, zlen - zpos - 1), max(0, zpos + zlen - zdim)),
     )
-    roi = np.pad(roi, padding)
+    roi = np.pad(roi, padding)[::stride, ::stride, ::stride]
     return roi
-
-
-# TODO: add test?
-def next_roi(
-    position: Tuple[int, int, int], direction: Tuple[int, int, int], image: np.ndarray, roi_len: Tuple[int, int, int]
-) -> np.ndarray:
-    next_position = tuple([position[i] + direction[i] for i in range(3)])
-    return get_roi_from_image(next_position, image, roi_len)
 
 
 def get_random_3d_pos(image_dims: Tuple[int, int, int]) -> Tuple[int, int, int]:
@@ -63,6 +62,7 @@ def eps_greedy_episode(
     max_steps: int,
     epsilon: float,
     roi_len: Tuple[int, int, int],
+    stride: int,
     model: torch.nn.Module,
     rb: ReplayBuffer,
     debug_starting_position: Optional[Tuple[int, int, int]],
@@ -73,7 +73,7 @@ def eps_greedy_episode(
         position = debug_starting_position
     steps = 1
     while True:
-        roi = get_roi_from_image(position, image_data, roi_len)
+        roi = get_roi_from_image(position, image_data, roi_len, stride)
         direction_label = image_label[position]
         rb.add_to_buffer((roi, direction_label))
         if position == landmark or steps >= max_steps:

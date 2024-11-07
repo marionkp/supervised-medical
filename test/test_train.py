@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from src.env import get_roi_dims_from_len_and_stride
 from src.nn_architecture import Net
 from src.replay_buffer import ReplayBuffer
 from src.train import batch_train
@@ -14,10 +15,11 @@ def test_batch_independence():
 
 def test_same_position_training():
     roi_len = (5, 5, 5)
-    roi_dims = tuple([2 * v - 1 for v in roi_len])
+    stride = 2
+    roi_dims = get_roi_dims_from_len_and_stride(roi_len, stride)
     batch_size = 1
     lr = 1e-3
-    model = Net(roi_len).to(get_device())
+    model = Net(roi_len, stride).to(get_device())
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     rb = ReplayBuffer(10)

@@ -44,6 +44,7 @@ def random_eps_greedy_episode(
     max_steps: int,
     epsilon: float,
     roi_len: Tuple[int, int, int],
+    stride: int,
     model: torch.nn.Module,
     rb: ReplayBuffer,
     keep_landmark_fixed: bool = False,
@@ -53,5 +54,5 @@ def random_eps_greedy_episode(
     else:
         landmark = get_random_3d_pos(image_dims)
     image_data = generate_data(*image_dims, *landmark)
-    steps, _ = eps_greedy_episode(image_data, landmark, max_steps, epsilon, roi_len, model, rb)
+    steps, _ = eps_greedy_episode(image_data, landmark, max_steps, epsilon, roi_len, stride, model, rb)
     return steps
