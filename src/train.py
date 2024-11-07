@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+import os
 import time
 
 import logging
@@ -17,6 +18,7 @@ from src.utils import get_device
 def batch_train(
     criterion: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler,
     rb: ReplayBuffer,
     model: torch.nn.Module,
     batch_size: int,
@@ -29,6 +31,7 @@ def batch_train(
     loss = criterion(pred_direction, true_direction)
     loss.backward()
     optimizer.step()
+    scheduler.step()
     loss = loss.detach().cpu().item()
     return loss
 
@@ -101,7 +104,7 @@ def training_run():
         "debug_dummy_image_dims": debug_dummy_image_dims,
     }
     logging.info(f"{config=}")
-    wandb.init(
+    wandb_run = wandb.init(
         project="supervised-medical-mayou", config=config, mode="online"
     )  # TODO: add argparse for mode="disabled" or "online"
 
@@ -116,8 +119,11 @@ def training_run():
     rb = ReplayBuffer(max_replay_size)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    # TODO: find a more principled tmax?
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 100 * batch_trained_per_epoch)
     warmup_replay_buffer(warmup_size, env, max_steps, roi_len, stride, rb, debug_starting_position)
     episode = 0
+    best_loss = float("inf")
     while True:
         sampling_image_avg_time = 0
         eps_greedy_episode_avg_time = 0
@@ -150,7 +156,7 @@ def training_run():
         batch_train_start_time = time.time()
         loss_avg = 0
         for _ in range(batch_trained_per_epoch):
-            loss_avg += batch_train(criterion, optimizer, rb, model, batch_size)
+            loss_avg += batch_train(criterion, optimizer, scheduler, rb, model, batch_size)
         loss_avg /= batch_trained_per_epoch
         batch_train_time = time.time() - batch_train_start_time
         log_dict = {
@@ -166,7 +172,14 @@ def training_run():
         }
         wandb.log(log_dict)
         logging.info(f"{log_dict=}")
-        # TODO: save model every once and a while
+        if episode % 100 == 0:
+            last_model_path = os.path.join(wandb_run.dir, "last.pt")
+            torch.save(model, last_model_path)
+        # TODO: better best model saving strategy based on evaluation data?
+        if best_loss > loss_avg:
+            best_loss = loss_avg
+            best_model_path = os.path.join(wandb_run.dir, "best.pt")
+            torch.save(model, best_model_path)
         epsilon = max(min_epsilon, epsilon - delta)
         episode += 1
 

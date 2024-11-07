@@ -8,12 +8,14 @@
 
 `python3 -m pytest`
 
-## Before commiting
-
-`python3 -m black . --line-length 120`
-
-TODO: add pre-commit hooks for black instead?
-
 ## Requirements
 
 Requires Python >=3.8
+
+## Contribute
+
+Install pre-commit hooks with: `pre-commit install`
+
+This runs pre-commit hooks, including `black` to ensure code style consistency.
+
+The same `black` hook can also be run independently with: `python3 -m black . --line-length 120`
