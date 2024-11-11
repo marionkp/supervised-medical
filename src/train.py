@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import wandb
 
-from src.env import eps_greedy_episode
+from src.env import eps_greedy_episode, eps_greedy_episode_batched
 from src.generate_dummy_data import random_eps_greedy_episode
 from src.medical_loader import MedicalEnv
 from src.nn_architecture import Net
@@ -31,7 +31,8 @@ def batch_train(
     loss = criterion(pred_direction, true_direction)
     loss.backward()
     optimizer.step()
-    scheduler.step()
+    # TODO: scheduler?
+    # scheduler.step()
     loss = loss.detach().cpu().item()
     return loss
 
@@ -43,15 +44,15 @@ def warmup_replay_buffer(
     roi_len: Tuple[int, int, int],
     stride: int,
     rb: ReplayBuffer,
-    debug_starting_position: Optional[Tuple[int, int, int]],
+    batch_size: int,
 ):
     assert warmup_size <= rb.max_size
     epsilon = 1
-    model = None  # No model prediction during model
+    model = None  # No model prediction during warmup
     while len(rb) < warmup_size:
         image_data, image_label, landmark = env.sample_image_label_landmark()
-        eps_greedy_episode(
-            image_data, image_label, landmark, max_steps, epsilon, roi_len, stride, model, rb, debug_starting_position
+        eps_greedy_episode_batched(
+            batch_size, image_data, image_label, landmark, max_steps, epsilon, roi_len, stride, model, rb
         )
 
 
@@ -68,18 +69,25 @@ def training_run():
     delta = 0.001
     max_steps = 100
     max_replay_size = 4000  # 10000
-    batch_size = 1024  # 4096
-    # TODO: learning rate schedule? warmup and then decrease
+    collection_batch_size = 8
+    train_batch_size = 1024  # 4096
     lr = 1e-4
+    scheduler_t_max = 1000
     landmark_index = 0
     batch_trained_per_epoch = 1
-    episodes_collected_per_epoch = 4
+    episodes_collected_per_epoch = 1
     debug_max_num_files = 1
     debug_starting_position = None
     debug_image_type = "real"  # dummy or real
     debug_dummy_image_dims = (10, 10, 10)
 
-    warmup_size = max(batch_size, max_replay_size // 100)
+    # at each epoch the number of samples trained on is:
+    # batch_trained_per_epoch * train_batch_size
+
+    # at each epoch the number of samples collected on is:
+    # episodes_collected_per_epoch * collection_batch_size * max_size
+
+    warmup_size = max(train_batch_size, max_replay_size // 100)
 
     model = Net(roi_len, stride).to(get_device())
     model_num_params = sum(p.numel() for p in model.parameters())
@@ -91,7 +99,8 @@ def training_run():
         "stride": stride,
         "max_steps": max_steps,
         "max_replay_size": max_replay_size,
-        "batch_size": batch_size,
+        "train_batch_size": train_batch_size,
+        "collection_batch_size": collection_batch_size,
         "warmup_size": warmup_size,
         "min_epsilon": min_epsilon,
         "learning_rate": lr,
@@ -102,6 +111,7 @@ def training_run():
         "debug_starting_position": debug_starting_position,
         "debug_image_type": debug_image_type,
         "debug_dummy_image_dims": debug_dummy_image_dims,
+        "scheduler_t_max": scheduler_t_max,
     }
     logging.info(f"{config=}")
     wandb_run = wandb.init(
@@ -119,9 +129,9 @@ def training_run():
     rb = ReplayBuffer(max_replay_size)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    # TODO: find a more principled tmax?
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 100 * batch_trained_per_epoch)
-    warmup_replay_buffer(warmup_size, env, max_steps, roi_len, stride, rb, debug_starting_position)
+    # TODO: scheduler?
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_t_max * batch_trained_per_epoch)
+    warmup_replay_buffer(warmup_size, env, max_steps, roi_len, stride, rb, collection_batch_size)
     episode = 0
     best_loss = float("inf")
     while True:
@@ -134,7 +144,8 @@ def training_run():
             image_data, image_label, landmark = env.sample_image_label_landmark()
             sampling_image_avg_time += time.time() - sampling_image_start_time
             eps_greedy_episode_start_time = time.time()
-            steps, final_dist = eps_greedy_episode(
+            steps, final_dist = eps_greedy_episode_batched(
+                collection_batch_size,
                 image_data,
                 image_label,
                 landmark,
@@ -144,7 +155,6 @@ def training_run():
                 stride,
                 model,
                 rb,
-                debug_starting_position,
             )
             steps_avg += steps
             final_dist_avg += final_dist
@@ -156,7 +166,7 @@ def training_run():
         batch_train_start_time = time.time()
         loss_avg = 0
         for _ in range(batch_trained_per_epoch):
-            loss_avg += batch_train(criterion, optimizer, scheduler, rb, model, batch_size)
+            loss_avg += batch_train(criterion, optimizer, scheduler, rb, model, train_batch_size)
         loss_avg /= batch_trained_per_epoch
         batch_train_time = time.time() - batch_train_start_time
         log_dict = {

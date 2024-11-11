@@ -90,12 +90,15 @@ class MedicalEnv:
 
     def sample_image_label_landmark(self) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
         if self.debug_image_type == "real":
-            sampled_index = random.randint(0, self.num_files - 1)
+            sampled_index = self.sample_file_index()
             return self.get_image_label_landmark(sampled_index)
         elif self.debug_image_type == "dummy":
             return self.sample_dummy_image_label_landmark()
         else:
             raise NotImplementedError()
+
+    def sample_file_index(self):
+        return random.randint(0, self.num_files - 1)
 
     def sample_dummy_image_label_landmark(self) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int, int]]:
         assert self.debug_dummy_image_dims is not None, f"debug_dummy_image_dims is None, provide some dummy dimensions"

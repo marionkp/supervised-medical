@@ -26,8 +26,9 @@ def test_same_position_training():
     roi = np.ones(roi_dims)
     direction_label = np.array([-1, 0, 1])
     rb.add_to_buffer((roi, direction_label))
-    loss = batch_train(criterion, optimizer, rb, model, batch_size)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 200)
+    loss = batch_train(criterion, optimizer, scheduler, rb, model, batch_size)
     assert loss > 1e-2
     for _ in range(100):
-        loss = batch_train(criterion, optimizer, rb, model, batch_size)
+        loss = batch_train(criterion, optimizer, scheduler, rb, model, batch_size)
     assert loss < 1e-5
