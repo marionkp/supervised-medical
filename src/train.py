@@ -69,17 +69,18 @@ def training_run():
     delta = 0.001
     max_steps = 100
     max_replay_size = 4000  # 10000
-    collection_batch_size = 8
+    collection_batch_size = 1
     train_batch_size = 1024  # 4096
     lr = 1e-4
     scheduler_t_max = 1000
     landmark_index = 0
     batch_trained_per_epoch = 1
-    episodes_collected_per_epoch = 1
-    debug_max_num_files = 1
+    episodes_collected_per_epoch = 4
+    debug_max_num_files = None
     debug_starting_position = None
     debug_image_type = "real"  # dummy or real
     debug_dummy_image_dims = (10, 10, 10)
+    cache_images = False
 
     # at each epoch the number of samples trained on is:
     # batch_trained_per_epoch * train_batch_size
@@ -106,12 +107,14 @@ def training_run():
         "learning_rate": lr,
         "landmark_index": landmark_index,
         "batch_trained_per_epoch": batch_trained_per_epoch,
+        "episodes_collected_per_epoch": episodes_collected_per_epoch,
         "model_num_params": model_num_params,
         "debug_max_num_files": debug_max_num_files,
         "debug_starting_position": debug_starting_position,
         "debug_image_type": debug_image_type,
         "debug_dummy_image_dims": debug_dummy_image_dims,
         "scheduler_t_max": scheduler_t_max,
+        "cache_images": cache_images,
     }
     logging.info(f"{config=}")
     wandb_run = wandb.init(
@@ -124,13 +127,20 @@ def training_run():
     image_files = "/mnt/d/project_guy/filenames/image_files.txt"
     landmark_files = "/mnt/d/project_guy/filenames/landmark_files.txt"
     env = MedicalEnv(
-        image_files, landmark_files, landmark_index, debug_max_num_files, debug_image_type, debug_dummy_image_dims
+        image_files,
+        landmark_files,
+        landmark_index,
+        cache_images,
+        debug_max_num_files,
+        debug_image_type,
+        debug_dummy_image_dims,
     )
     rb = ReplayBuffer(max_replay_size)
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # TODO: scheduler?
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_t_max * batch_trained_per_epoch)
+    scheduler = None
     warmup_replay_buffer(warmup_size, env, max_steps, roi_len, stride, rb, collection_batch_size)
     episode = 0
     best_loss = float("inf")

@@ -58,6 +58,7 @@ class MedicalEnv:
         path_to_image_files: str,
         path_to_landmark_files: str,
         landmark_index: int,
+        cache_images: bool,
         debug_max_num_files: Optional[int],
         debug_image_type: str,
         debug_dummy_image_dims: Optional[Tuple[int, int, int]],
@@ -70,6 +71,7 @@ class MedicalEnv:
             self.num_files = min(debug_max_num_files, self.num_files)
         self.landmark_index = landmark_index
         self.path_to_data = {}
+        self.cache_images = cache_images
         self.debug_image_type = debug_image_type
         self.debug_dummy_image_dims = debug_dummy_image_dims
 
@@ -80,10 +82,12 @@ class MedicalEnv:
             landmark = read_landmark_file(self.landmark_file_paths[index])[self.landmark_index]
             label = create_image_label(image_data, landmark)
             logging.info(f"Loaded image and labels at index {index} - image shape {image_data.shape}")
-            self.path_to_data[index] = (image_data, label, landmark)
+            res = image_data, label, landmark
         else:
             logging.debug(f"Retrieving image and labels from cache at index {index}")
-        res = self.path_to_data[index]
+            res = self.path_to_data[index]
+        if self.cache_images:
+            self.path_to_data[index] = res
         image_load_time = time.time() - image_load_start_time
         wandb.log({"image_loading_time": image_load_time})
         return res
