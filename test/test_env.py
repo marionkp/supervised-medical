@@ -4,8 +4,8 @@ import torch
 from src.env import (
     dist_3d_points,
     get_random_3d_pos,
-    get_roi_from_image,
     get_roi_dims_from_len_and_stride,
+    get_roi_from_image,
     pred_to_direction,
     step_env,
 )

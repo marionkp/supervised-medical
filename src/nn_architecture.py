@@ -1,10 +1,9 @@
-from typing import Tuple
 import math
+from typing import Tuple
 
 import torch
 
 from src.env import get_roi_dims_from_len_and_stride
-
 
 # TODO: set device type
 

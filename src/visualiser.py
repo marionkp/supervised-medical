@@ -5,27 +5,27 @@ import math
 import numpy as np
 import pyglet
 from pyglet.gl import (
-    gl,
-    glTexParameteri,
+    GL_BLEND,
+    GL_LINEAR,
+    GL_ONE_MINUS_SRC_ALPHA,
+    GL_POINTS,
+    GL_POLYGON,
+    GL_QUADS,
+    GL_SRC_ALPHA,
     GL_TEXTURE_2D,
     GL_TEXTURE_MAG_FILTER,
-    GL_LINEAR,
     GL_TEXTURE_MIN_FILTER,
-    glScalef,
-    glEnable,
-    GL_BLEND,
-    glBlendFunc,
-    GL_SRC_ALPHA,
-    GL_ONE_MINUS_SRC_ALPHA,
-    GLubyte,
-    glBegin,
-    GL_POINTS,
-    glVertex3f,
-    glEnd,
-    GL_QUADS,
-    GL_POLYGON,
     GL_TRIANGLES,
+    GLubyte,
+    gl,
+    glBegin,
+    glBlendFunc,
     glColor4f,
+    glEnable,
+    glEnd,
+    glScalef,
+    glTexParameteri,
+    glVertex3f,
 )
 
 
@@ -134,9 +134,10 @@ class SimpleImageViewer:
         self.close()
 
 
+import time
+
 # TODO: remove tese test lines
 import numpy as np
-import time
 
 # img = np.random.random(size=(500, 500, 3))*255
 img = np.load("testimg.npy")

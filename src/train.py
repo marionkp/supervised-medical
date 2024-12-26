@@ -1,18 +1,18 @@
-from typing import Optional, Tuple
+import logging
 import os
 import time
+from typing import Optional, Tuple
 
-import logging
 import numpy as np
 import torch
-import wandb
 
+import wandb
 from src.env import eps_greedy_episode, eps_greedy_episode_batched
 from src.generate_dummy_data import random_eps_greedy_episode
 from src.medical_loader import MedicalEnv
 from src.nn_architecture import Net
 from src.replay_buffer import ReplayBuffer
-from src.utils import get_device
+from src.utils import agnostic_path, get_device
 
 
 def batch_train(
@@ -124,8 +124,8 @@ def training_run():
     # TODO: add dry-run/random data argparse option
 
     # TODO: move these hardcoded paths to argparse
-    image_files = "/mnt/d/project_guy/filenames/image_files.txt"
-    landmark_files = "/mnt/d/project_guy/filenames/landmark_files.txt"
+    image_files = agnostic_path("/mnt/d/project_guy/filenames/image_files.txt")
+    landmark_files = agnostic_path("/mnt/d/project_guy/filenames/landmark_files.txt")
     env = MedicalEnv(
         image_files,
         landmark_files,

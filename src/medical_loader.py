@@ -1,17 +1,19 @@
-from typing import List, Optional, Tuple
 import logging
 import random
 import time
+from typing import List, Optional, Tuple
 
 import numpy as np
 import SimpleITK as sitk
-import wandb
 
+import wandb
 from src.generate_dummy_data import generate_data, get_random_3d_pos
 from src.generate_label import create_image_label
+from src.utils import agnostic_path
 
 
 def load_image(image_path: str) -> np.ndarray:
+    image_path = agnostic_path(image_path)
     sitk_image = sitk.ReadImage(image_path, sitk.sitkFloat32)
     np_image = sitk.GetArrayFromImage(sitk_image)
     # threshold image between p10 and p99 then re-scale [0-255]
@@ -30,7 +32,9 @@ def load_image(image_path: str) -> np.ndarray:
 def read_paths_from_file(file_path: str) -> List[str]:
     with open(file_path, "r") as f:
         s = f.read().strip()
-    return s.split("\n")
+    paths = s.split("\n")
+    paths = list(map(agnostic_path, paths))
+    return paths
 
 
 def read_landmark_file(file_path: str) -> Tuple[Tuple[int, int, int]]:

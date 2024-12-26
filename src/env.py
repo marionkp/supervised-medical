@@ -1,6 +1,6 @@
-from typing import Optional, Tuple
 import math
 import random
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
