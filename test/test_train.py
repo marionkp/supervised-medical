@@ -8,13 +8,8 @@ from src.train import batch_train
 from src.utils import get_device
 
 
-def test_batch_independence():
-    # Test batch of size 1, no batch, and batch of size 2 are the same
-    pass
-
-
 def test_same_position_training():
-    roi_len = (5, 5, 5)
+    roi_len = (30, 30, 30)
     stride = 2
     roi_dims = get_roi_dims_from_len_and_stride(roi_len, stride)
     batch_size = 1
@@ -23,8 +18,9 @@ def test_same_position_training():
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     rb = ReplayBuffer(10)
-    roi = np.ones(roi_dims)
-    direction_label = np.array([-1, 0, 1])
+    roi = np.ones((1, *roi_dims))  # Add batch dimension
+    direction_label = np.array([[-1, 0, 1]])  # Add batch dimension
+    direction_label = direction_label / np.sqrt(np.sum(direction_label**2, axis=-1, keepdims=True))
     rb.add_to_buffer((roi, direction_label))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 200)
     loss = batch_train(criterion, optimizer, scheduler, rb, model, batch_size)

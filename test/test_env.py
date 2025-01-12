@@ -6,9 +6,11 @@ from src.env import (
     get_random_3d_pos,
     get_roi_dims_from_len_and_stride,
     get_roi_from_image,
+    eps_greedy_episode_batched,
     pred_to_direction,
     step_env,
 )
+from src.replay_buffer import ReplayBuffer
 
 
 def test_roi_is_full_image():
@@ -61,8 +63,16 @@ def test_3d_point_dist():
 
 
 def test_pred_to_direction():
-    directions = pred_to_direction(torch.tensor([[0.8, 1, 5], [-2, -0.2, 0.4]]))
-    assert (directions == np.array([[1, 1, 1], [-1, 0, 0]])).all()
+    test_vectors = [
+        torch.tensor([[0.8, 1, 5], [-2, -0.2, 0.4]]),
+        torch.tensor([[1.0, 0.0, 0.0]]),
+        torch.tensor([[0.1, 0.1, 0.1]]),
+        torch.tensor([[-0.6, 0.3, 0.3]]),
+    ]
+    expected_results = [[[1, 1, 1], [-1, 0, 0]], [1, 0, 0], [0, 0, 0], [-1, 0, 0]]
+    for test_vec, expected in zip(test_vectors, expected_results):
+        direction = pred_to_direction(test_vec)
+        assert (direction == expected).all(), f"Failed for {test_vec}, got {direction}, expected {expected}"
 
 
 def test_step_env():
@@ -86,3 +96,55 @@ def test_get_random_3d_pos():
 # TODO: add test to check the right samples are given to the replay buffer during the episode
 
 # TODO: check if agent within image of size 2x2x2 gets perfect accuracy
+
+# def test_get_roi_batch_matches_single():
+#     # Create a test image
+#     image = np.arange(27).reshape(3, 3, 3)
+#     roi_len = (2, 2, 2)
+#     stride = 1
+
+#     # Test multiple positions
+#     positions = np.array([
+#         [1, 1, 1],
+#         [0, 0, 0],
+#         [2, 2, 2]
+#     ])
+
+#     # Get ROIs using batch function
+#     batch_rois = get_roi_from_image_batch(positions, image, roi_len, stride)
+
+#     # Get ROIs one by one
+#     single_rois = []
+#     for pos in positions:
+#         roi = get_roi_from_image(tuple(pos), image, roi_len, stride)
+#         single_rois.append(roi)
+#     single_rois = np.stack(single_rois)
+
+#     # Compare results
+#     np.testing.assert_array_equal(batch_rois, single_rois)
+
+
+def test_eps_greedy_episode_batch():
+    # Create a simple test environment
+    image_data = np.zeros((5, 5, 5))
+    image_label = np.zeros((5, 5, 5, 3))
+    landmark = (4, 4, 4)
+    max_steps = 10
+    epsilon = 1.0  # Always random for testing
+    roi_len = (2, 2, 2)
+    stride = 1
+    model = None  # Not needed when epsilon = 1
+    rb = ReplayBuffer(1000)
+    batch_size = 3
+
+    # Run the function
+    steps, final_dists = eps_greedy_episode_batched(
+        batch_size, image_data, image_label, landmark, max_steps, epsilon, roi_len, stride, model, rb
+    )
+
+    # Check outputs
+    assert len(steps) == batch_size
+    assert len(final_dists) == batch_size
+    assert all(0 <= s <= max_steps for s in steps)
+    assert all(0 <= d <= np.sqrt(3 * 4**2) for d in final_dists)  # Max distance in 5x5x5 grid
+    assert len(rb) > 0  # Should have added some experiences to replay buffer

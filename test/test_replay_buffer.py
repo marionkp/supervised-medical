@@ -10,7 +10,7 @@ def test_replay_buffer_empty():
         rb.sample_roi_and_label(10)
 
 
-def test_replay_buffer_empty():
+def test_replay_buffer_add_and_sample():
     rb = ReplayBuffer(100)
     image = np.ones((1, 2, 3, 4))
     label = np.ones((1, 3))
